@@ -1,115 +1,44 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace ApsTask
 {
     public class Sorting
     {
-        /*
-        public static WorkTask[] GetSortedTasks(WorkTask[] tasks)
-        {
-            var workTasks = tasks.Where(task => !task.isAdjust).ToArray();
-            foreach (var g in workTasks.GroupBy(t => t.batchId))
-                if (g.Count() > 1)
-                {
-                    var ops = g.OrderBy(t => t.nop).ThenBy(t => t.Pos).ToArray();
-                    for (int i = 0; i < ops.Length; i++)
-                    {
-                        WorkTask task = ops[i];
-                        task.opIndexInBatch = i;
-                        if (i > 0 && task.Pos <= ops[i - 1].Pos)
-                            task.newPos = ops[i - 1].Pos + 1;
-                    }
-                }
-
-            PrintList(workTasks, "sorted input:");
-            List<WorkTask> sortedTasks = new List<WorkTask>();
-            var tasksById = workTasks.ToDictionary(t => t.Id);
-
-            foreach (var task in workTasks)
-                if (task.prevTaskId > 0)
-                {
-                    if (tasksById.TryGetValue(task.prevTaskId, out WorkTask prevTask))
-                        task.newPos = prevTask.newPos + 1;
-                }
-
-            foreach (var task in workTasks.Where(t => t.mustFirst))
-                AddTask(task);
-            //PrintList(sortedTasks, "sorted must first tasks:");
-            foreach (var task in workTasks.Where(t => t.doing))
-                AddTask(task);
-            //PrintList(sortedTasks, "sorted doing tasks:");
-            foreach (var task in workTasks.Where(t => t.mustNext))
-                AddTask(task);
-            foreach (var task in workTasks.OrderBy(t => t.newPos))
-                AddTask(task);
-
-            for (int i = 0; i < sortedTasks.Count; i++)
-                sortedTasks[i].newPos = (i + 1) * 10 + 1;
-            foreach (var task in tasks)
-                if (task.isAdjust)
-                    foreach (var opTask in sortedTasks.Where(t => t.opId == task.opId))
-                        task.newPos = opTask.newPos - 1;
-            //PrintList(sortedTasks, "sorted work tasks:");
-            Array.Sort(tasks, (a, b) => a.newPos - b.newPos);
-            //PrintList(tasks, "sorted tasks:");
-            for (int i = 0; i < tasks.Length; i++)
-                tasks[i].newPos = i + 1;
-            return tasks;
-
-            void AddRelatedTasks(WorkTask task)
-            {
-                foreach (var task2 in workTasks)
-                    if (task2.adjust == task.adjust)
-                    {
-                        if (!sortedTasks.Contains(task2))
-                            sortedTasks.Add(task2);
-                    }
-                foreach (var task2 in workTasks)
-                    if (task2.batchId == task.batchId)
-                    {
-                        if (!sortedTasks.Contains(task2))
-                            sortedTasks.Add(task2);
-                    }
-                foreach (var task2 in workTasks)
-                    if (task2.prevTaskId == task.Id)
-                    {
-                        if (!sortedTasks.Contains(task2))
-                            sortedTasks.Add(task2);
-                    }
-            }
-
-            void AddTask(WorkTask task)
-            {
-                if (!sortedTasks.Contains(task))
-                {
-                    sortedTasks.Add(task);
-                    AddRelatedTasks(task);
-                }
-            }
-        }
-        */
         public static void SortTasks(WorkTask[] tasks)
         {
             var workTasks = tasks.Where(task => !task.isAdjust).ToArray();
             if (workTasks.Length == 0) return;
-            List<WorkTask> sortedTasks = new List<WorkTask>();
 
-            foreach (var task in workTasks.Where(t => t.mustFirst))
+            foreach (var task in tasks.Where(task => task.prevTaskId > 0))
+                foreach (var t in tasks.Where(t => t.Id == task.prevTaskId && t.OpId != task.OpId))
+                {
+                    foreach (var opTask in tasks)
+                        if (opTask.OpId == task.OpId)
+                        {
+                            opTask.PrevOpId = t.OpId;
+                        }
+                    break;
+                }
+            List<WorkTask> sortedTasks = new List<WorkTask>(workTasks.Length);
+            while (sortedTasks.Count < workTasks.Length)
+            {
+                var task = workTasks.Where(t => !sortedTasks.Contains(t))
+                    .OrderByDescending(t => t.mustFirst)
+                    .ThenByDescending(t => t.doing)
+                    .ThenByDescending(t => t.mustNext)
+                    .ThenBy(t => t.NewPos)
+                    .FirstOrDefault();
+                if (task == null) break;
                 AddTask(task);
-            foreach (var task in workTasks.Where(t => t.doing))
-                AddTask(task);
-            foreach (var task in workTasks.Where(t => t.mustNext))
-                AddTask(task);
-            foreach (var task in workTasks.OrderBy(t => t.NewPos))
-                AddTask(task);
-
+            }
             for (int i = 0; i < sortedTasks.Count; i++)
                 sortedTasks[i].NewPos = (i + 1) * 10 + 1;
             foreach (var task in tasks)
                 if (task.isAdjust)
-                    foreach (var opTask in sortedTasks.Where(t => t.opId == task.opId))
+                    foreach (var opTask in sortedTasks.Where(t => t.OpId == task.OpId))
                         task.NewPos = opTask.NewPos - 1;
             Array.Sort(tasks, (a, b) => a.NewPos - b.NewPos);
             for (int i = 0; i < tasks.Length; i++)
@@ -119,7 +48,12 @@ namespace ApsTask
             void AddRelatedTasks(WorkTask task)
             {
                 foreach (var task2 in workTasks)
-                    if (task2.prevTaskId == task.Id)
+                    if (task2.mustNext)
+                    {
+                        AddTask(task2);
+                    }
+                foreach (var task2 in workTasks)
+                    if (task2.PrevOpId == task.OpId)
                     {
                         AddTask(task2);
                     }
@@ -136,7 +70,8 @@ namespace ApsTask
             }
             void AddTask(WorkTask task)
             {
-                if (!sortedTasks.Contains(task))
+                if (!sortedTasks.Contains(task)
+                    && !workTasks.Any(t => t.batchId == task.batchId && t.BatchOpIndex < task.BatchOpIndex && !sortedTasks.Contains(t)))
                 {
                     sortedTasks.Add(task);
                     AddRelatedTasks(task);
@@ -149,7 +84,7 @@ namespace ApsTask
         private int pos;
         public int Pos => pos;
         public int Id;
-        public int opId;
+        public int OpId;
         public int NewPos;
         public string adjust;
         public int opIndexInBatch;
@@ -159,12 +94,13 @@ namespace ApsTask
         public bool isAdjust;
         public int batchId;
         public string nop;
+        public int BatchOpIndex => int.TryParse(nop, out int i) ? i : 0;
         public int prevTaskId;
-
+        public int PrevOpId;
         public WorkTask(int id, int opId, int pos, int batchId, string adjust, bool isAdjust = false, bool mustFirst = false, bool doing = false)
         {
             Id = id;
-            this.opId = opId;
+            OpId = opId;
             this.pos = pos;
             //newPos = pos;
             this.adjust = adjust;
@@ -173,6 +109,6 @@ namespace ApsTask
             this.doing = doing;
             this.batchId = batchId;
         }
-        override public string ToString() => $"id={Id} {pos}->{NewPos} {adjust}  mk{batchId} nop{nop} {(doing ? "doing" : "")} {(mustFirst ? "mustFirst" : "")} {(isAdjust ? "adjust" : "")} mks{opId} prev={prevTaskId}";
+        override public string ToString() => $"id={Id} {pos}->{NewPos} {adjust}  mk{batchId} nop{nop} {(doing ? "doing" : "")} {(mustFirst ? "mustFirst" : "")} {(isAdjust ? "adjust" : "")} mks{OpId} prevOp={PrevOpId}";
     }
 }

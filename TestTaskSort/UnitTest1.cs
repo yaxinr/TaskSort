@@ -1,4 +1,5 @@
 using ApsTask;
+using System.Threading.Tasks;
 
 namespace TestTaskSort
 {
@@ -52,6 +53,29 @@ namespace TestTaskSort
             Assert.AreEqual(2, task3.NewPos);
             Assert.AreEqual(3, task4.NewPos);
             Assert.AreEqual(4, task2.NewPos);
+        }
+        [TestMethod]
+        public void TestTwoBatchOpsAndPrev()
+        {
+            WorkTask task1 = new(id: 1, opId: 11, pos: 1, batchId: 1, adjust: "1") { nop = "020", doing = true };
+            //var task30 = new WorkTask(id: 30, opId: 31, pos: 3, batchId: 3, adjust: "31", isAdjust: true) { nop = "025", mustNext = true };
+            var task31 = new WorkTask(id: 31, opId: 31, pos: 3, batchId: 3, adjust: "31") { nop = "025", mustNext = true, };
+            var task40 = new WorkTask(id: 40, opId: 32, pos: 4, batchId: 4, adjust: "32", isAdjust: true) { nop = "030", prevTaskId = task31.Id };
+            var task41 = new WorkTask(id: 41, opId: 32, pos: 4, batchId: 4, adjust: "32") { nop = "030", prevTaskId = task40.Id };
+            WorkTask task2 = new(id: 2, opId: 12, pos: 2, batchId: task1.batchId, adjust: "21") { nop = "025", prevTaskId = task41.Id };
+            WorkTask[] tasks = new WorkTask[] {
+                task1,
+                task2,
+                task31,
+                task40,
+                task41
+            };
+            Sorting.SortTasks(tasks);
+            Assert.AreEqual(1, task1.NewPos);
+            Assert.AreEqual(2, task31.NewPos);
+            Assert.AreEqual(3, task40.NewPos);
+            Assert.AreEqual(4, task41.NewPos);
+            Assert.AreEqual(5, task2.NewPos);
         }
     }
 }
