@@ -22,6 +22,9 @@ namespace ApsTask
                         }
                     break;
                 }
+            foreach (var task in workTasks)
+                foreach (var t in workTasks.Where(t => t != task && t.batchId == task.batchId && t.BatchOpIndex > task.BatchOpIndex && t.Pos < task.Pos))
+                    t.Pos = task.Pos;
             List<WorkTask> sortedTasks = new List<WorkTask>(workTasks.Length);
             while (sortedTasks.Count < workTasks.Length)
             {
@@ -29,7 +32,8 @@ namespace ApsTask
                     .OrderByDescending(t => t.mustFirst)
                     .ThenByDescending(t => t.doing)
                     .ThenByDescending(t => t.mustNext)
-                    .ThenBy(t => t.NewPos)
+                    .ThenBy(t => t.Pos)
+                    .ThenBy(t => t.BatchOpIndex)
                     .FirstOrDefault();
                 if (task == null) break;
                 AddTask(task);
@@ -70,8 +74,7 @@ namespace ApsTask
             }
             void AddTask(WorkTask task)
             {
-                if (!sortedTasks.Contains(task)
-                    && !workTasks.Any(t => t.batchId == task.batchId && t.BatchOpIndex < task.BatchOpIndex && !sortedTasks.Contains(t)))
+                if (!sortedTasks.Contains(task))
                 {
                     sortedTasks.Add(task);
                     AddRelatedTasks(task);
@@ -81,8 +84,7 @@ namespace ApsTask
     }
     public class WorkTask
     {
-        private int pos;
-        public int Pos => pos;
+        public int Pos;
         public int Id;
         public int OpId;
         public int NewPos;
@@ -101,7 +103,7 @@ namespace ApsTask
         {
             Id = id;
             OpId = opId;
-            this.pos = pos;
+            Pos = pos;
             //newPos = pos;
             this.adjust = adjust;
             this.mustFirst = mustFirst;
@@ -109,6 +111,6 @@ namespace ApsTask
             this.doing = doing;
             this.batchId = batchId;
         }
-        override public string ToString() => $"id={Id} {pos}->{NewPos} {adjust}  mk{batchId} nop{nop} {(doing ? "doing" : "")} {(mustFirst ? "mustFirst" : "")} {(isAdjust ? "adjust" : "")} mks{OpId} prevOp={PrevOpId}";
+        override public string ToString() => $"id={Id} {Pos}->{NewPos} {adjust}  mk{batchId} nop{nop} {(doing ? "doing" : "")} {(mustFirst ? "mustFirst" : "")} {(isAdjust ? "adjust" : "")} mks{OpId} prevOp={PrevOpId}";
     }
 }
