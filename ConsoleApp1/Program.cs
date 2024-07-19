@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace ApsTask
 {
@@ -9,29 +8,36 @@ namespace ApsTask
     {
         public static void SortTasks(WorkTask[] tasks)
         {
+            var lookup = tasks.ToLookup(t => t.OpId);
+            foreach (var doingTask in tasks.Where(task => task.doing))
+                foreach (var opTask in lookup[doingTask.OpId])
+                    opTask.doing = true;
             var workTasks = tasks.Where(task => !task.isAdjust).ToArray();
             if (workTasks.Length == 0) return;
-
-            foreach (var task in tasks.Where(task => task.prevTaskId > 0))
-                foreach (var t in tasks.Where(t => t.Id == task.prevTaskId && t.OpId != task.OpId))
+            foreach (var ts in workTasks.GroupBy(t => t.batchId))
+            {
+                var arr = ts.OrderBy(t => t.BatchOpIndex).ToArray();
+                for (int i = 0; i < arr.Length; i++)
+                    arr[i].IndexInBatch = i;
+            }
+            foreach (var nextTask in tasks.Where(task => task.prevTaskId > 0))
+                foreach (var prevTask in tasks.Where(t => t.Id == nextTask.prevTaskId && t.OpId != nextTask.OpId))
                 {
-                    foreach (var opTask in tasks)
-                        if (opTask.OpId == task.OpId)
-                        {
-                            opTask.PrevOpId = t.OpId;
-                        }
+                    foreach (var nextOpTask in tasks.Where(t => t.OpId == nextTask.OpId))
+                        nextOpTask.PrevOpId = prevTask.OpId;
                     break;
                 }
             foreach (var task in workTasks)
                 foreach (var t in workTasks.Where(t => t != task && t.batchId == task.batchId && t.BatchOpIndex > task.BatchOpIndex && t.Pos < task.Pos))
                     t.Pos = task.Pos;
-            List<WorkTask> sortedTasks = new List<WorkTask>(workTasks.Length);
+            var sortedTasks = new List<WorkTask>(workTasks.Length);
             while (sortedTasks.Count < workTasks.Length)
             {
                 var task = workTasks.Where(t => !sortedTasks.Contains(t))
                     .OrderByDescending(t => t.mustFirst)
                     .ThenByDescending(t => t.doing)
                     .ThenByDescending(t => t.mustNext)
+                    .ThenBy(t => t.IndexInBatch)
                     .ThenBy(t => t.Pos)
                     .ThenBy(t => t.BatchOpIndex)
                     .FirstOrDefault();
@@ -61,10 +67,10 @@ namespace ApsTask
                     {
                         AddTask(task2);
                     }
-                foreach (var task2 in workTasks)
-                    if (task2.adjust == task.adjust)
+                foreach (var t in workTasks)
+                    if (t.adjust == task.adjust && t.IndexInBatch == 0)
                     {
-                        AddTask(task2);
+                        AddTask(t);
                     }
                 foreach (var task2 in workTasks)
                     if (task2.batchId == task.batchId)
@@ -89,7 +95,7 @@ namespace ApsTask
         public int OpId;
         public int NewPos;
         public string adjust;
-        public int opIndexInBatch;
+        public int IndexInBatch;
         public bool doing;
         public bool mustFirst;
         public bool mustNext;
