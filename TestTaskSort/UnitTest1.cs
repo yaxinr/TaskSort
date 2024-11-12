@@ -77,5 +77,33 @@ namespace TestTaskSort
             Assert.AreEqual(4, task41.NewPos);
             Assert.AreEqual(5, task2.NewPos);
         }
+        [TestMethod]
+        public void TestBatchOps()
+        {
+            WorkTask task1 = new(id: 1, opId: 11, pos: 2, batchId: 1, adjust: "1") { nop = "025" };
+            var task2 = new WorkTask(id: 31, opId: 31, pos: 3, batchId: 1, adjust: "31") { nop = "020" };
+            WorkTask[] tasks = new WorkTask[] {
+                task1,
+                task2,
+            };
+            Sorting.SortTasks(tasks);
+            Assert.AreEqual(1, task2.NewPos);
+            Assert.AreEqual(2, task1.NewPos);
+        }
+        [TestMethod]
+        public void TestBatchOpsAfterDoing()
+        {
+            var task0 = new WorkTask(id: 5, opId: 6, pos: 1, batchId: 0, adjust: "1") { nop = "025", doing = true };
+            var task1 = new WorkTask(id: 1, opId: 11, pos: 2, batchId: 1, adjust: "1") { nop = "025" };
+            var task2 = new WorkTask(id: 31, opId: 31, pos: 3, batchId: 1, adjust: "31") { nop = "020" };
+            WorkTask[] tasks = new WorkTask[] {
+                task0,
+                task1,
+                task2,
+            };
+            Sorting.SortTasks(tasks);
+            Assert.AreEqual(2, task2.NewPos);
+            Assert.AreEqual(3, task1.NewPos);
+        }
     }
 }

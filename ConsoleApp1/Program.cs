@@ -59,24 +59,15 @@ namespace ApsTask
             {
                 foreach (var task2 in workTasks)
                     if (task2.mustNext)
-                    {
                         AddTask(task2);
-                    }
-                foreach (var task2 in workTasks)
-                    if (task2.PrevOpId == task.OpId)
-                    {
-                        AddTask(task2);
-                    }
-                foreach (var t in workTasks)
-                    if (t.adjust == task.adjust && t.IndexInBatch == 0)
-                    {
-                        AddTask(t);
-                    }
+                bool adjustSelector(WorkTask t) => t.adjust == task.adjust && t.IndexInBatch == 0;
+                foreach (var task2 in workTasks.Where(t => t.PrevOpId == task.OpId).OrderByDescending(adjustSelector))
+                    AddTask(task2);
+                foreach (var t in workTasks.Where(adjustSelector))
+                    AddTask(t);
                 foreach (var task2 in workTasks)
                     if (task2.batchId == task.batchId)
-                    {
                         AddTask(task2);
-                    }
             }
             void AddTask(WorkTask task)
             {
